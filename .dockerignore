@@ -1,0 +1,8 @@
+node_modules
+coverage
+.git
+.npm-cache
+.env
+jenkins
+Jenkinsfile
+sonar-project.properties
