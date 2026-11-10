@@ -7,7 +7,11 @@ pipeline {
     }
 
     environment {
-        IMAGE_NAME = 'cicd-nodejs-pipeline'
+        IMAGE_NAME         = 'cicd-nodejs-pipeline'
+        AWS_DEFAULT_REGION = 'ap-south-1'
+        // Replace with your 12-digit AWS Account ID
+        AWS_ACCOUNT_ID     = '211078959447'
+        ECR_REGISTRY       = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com"
     }
 
     stages {
@@ -65,6 +69,35 @@ pipeline {
                       ${IMAGE_NAME}:${IMAGE_TAG}
                 '''
             }
+        }
+
+        stage('Push to AWS ECR') {
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: 'aws-ecr-credentials',
+                    usernameVariable: 'AWS_ACCESS_KEY_ID',
+                    passwordVariable: 'AWS_SECRET_ACCESS_KEY'
+                )]) {
+                    sh '''
+                        # 1. Login to Amazon ECR
+                        aws ecr get-login-password --region ${AWS_DEFAULT_REGION} | docker login --username AWS --password-stdin ${ECR_REGISTRY}
+
+                        # 2. Tag image with build-commit tag and latest
+                        docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${ECR_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}
+                        docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${ECR_REGISTRY}/${IMAGE_NAME}:latest
+
+                        # 3. Push both tags to ECR
+                        docker push ${ECR_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}
+                        docker push ${ECR_REGISTRY}/${IMAGE_NAME}:latest
+                    '''
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            sh 'docker logout ${ECR_REGISTRY} || true'
         }
     }
 }
